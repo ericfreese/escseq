@@ -17,8 +17,8 @@ const (
 )
 
 type Token interface {
-	Type() TokenType
-	Val() string
+	Type() TokenType // One of the Tok* constants
+	Val() string     // Content of the token, empty if type TokNone
 }
 
 type token struct {

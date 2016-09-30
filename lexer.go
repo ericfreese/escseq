@@ -15,6 +15,13 @@ const (
 	lexCSInter
 )
 
+// The Lexer interface wraps the ReadToken method.
+//
+// ReadToken reads a single Token from the input stream. It will
+// return the Token and any errors it encountered while reading the
+// Token. If no Token can be read, it will return a Token with type
+// TokNone. If an unexpected input is found, it will return a Token
+// with type TokUnknown.
 type Lexer interface {
 	ReadToken() (Token, error)
 }
@@ -25,16 +32,11 @@ type lexer struct {
 	rd        io.RuneScanner
 }
 
-// Returns a Lexer that can read tokens from the provided io.Reader
+// Returns a Lexer that reads tokens from the provided io.Reader
 func NewLexer(rd io.Reader) Lexer {
 	return &lexer{lexDefault, lexDefault, bufio.NewReader(rd)}
 }
 
-// ReadToken reads a single Token from the input stream. It will
-// return the Token and any errors it encountered while reading the
-// Token. If no Token can be read, it will return a Token with type
-// TokNone. If an unexpected input is found, it will return a Token
-// with type TokUnknown.
 func (l *lexer) ReadToken() (Token, error) {
 	r, _, err := l.rd.ReadRune()
 
