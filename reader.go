@@ -6,72 +6,72 @@ import (
 	"io"
 )
 
-type lexerState uint8
+type readerState uint8
 
 const (
-	lexDefault lexerState = iota
-	lexEsc
-	lexCSParam
-	lexCSInter
+	rsDefault readerState = iota
+	rdEsc
+	rdCSParam
+	rdCSInter
 )
 
-// The Lexer interface wraps the ReadToken method.
+// The Reader interface wraps the ReadToken method.
 //
 // ReadToken reads a single Token from the input stream. It will
 // return the Token and any errors it encountered while reading the
 // Token. If no Token can be read, it will return a Token with type
 // TokNone. If an unexpected input is found, it will return a Token
 // with type TokUnknown.
-type Lexer interface {
+type Reader interface {
 	ReadToken() (Token, error)
 }
 
-type lexer struct {
-	lastState lexerState
-	state     lexerState
-	rd        io.RuneScanner
+type reader struct {
+	lastState readerState
+	state     readerState
+	rs        io.RuneScanner
 }
 
-// Returns a Lexer that reads tokens from the provided io.Reader
-func NewLexer(rd io.Reader) Lexer {
-	return &lexer{lexDefault, lexDefault, bufio.NewReader(rd)}
+// Returns a Reader that reads tokens from the provided io.Reader.
+func NewReader(rd io.Reader) Reader {
+	return &reader{rsDefault, rsDefault, bufio.NewReader(rd)}
 }
 
-func (l *lexer) ReadToken() (Token, error) {
-	r, _, err := l.rd.ReadRune()
+func (rd *reader) ReadToken() (Token, error) {
+	r, _, err := rd.rs.ReadRune()
 
 	if err != nil {
 		return &token{TokNone, ""}, err
 	}
 
-	switch l.state {
-	case lexDefault:
+	switch rd.state {
+	case rsDefault:
 		if r == 0x1b {
-			l.setState(lexEsc)
+			rd.setState(rdEsc)
 			return &token{TokEsc, string(r)}, nil
 		} else {
 			return &token{TokText, string(r)}, nil
 		}
-	case lexEsc:
+	case rdEsc:
 		if r >= 0x40 && r <= 0x5f {
 			if r == '[' {
-				l.setState(lexCSParam)
+				rd.setState(rdCSParam)
 			} else {
-				l.setState(lexDefault)
+				rd.setState(rsDefault)
 			}
 
 			return &token{TokFe, string(r)}, nil
 		}
-	case lexCSParam:
+	case rdCSParam:
 		switch {
 		case r >= 0x40 && r <= 0x7e:
-			l.setState(lexDefault)
+			rd.setState(rsDefault)
 			return &token{TokFinal, string(r)}, nil
-		case l.lastState == lexEsc && r >= 0x3c && r <= 0x3f:
-			l.rd.UnreadRune()
-			return l.readCSPrivParam()
+		case rd.lastState == rdEsc && r >= 0x3c && r <= 0x3f:
+			rd.rs.UnreadRune()
+			return rd.readCSPrivParam()
 		case r >= 0x30 && r <= 0x3f:
-			l.setState(lexCSParam)
+			rd.setState(rdCSParam)
 
 			switch {
 			case r >= 0x3c && r <= 0x3f:
@@ -81,34 +81,34 @@ func (l *lexer) ReadToken() (Token, error) {
 			case r == ';':
 				return &token{TokSep, string(r)}, nil
 			default:
-				l.rd.UnreadRune()
-				return l.readCSParamNum()
+				rd.rs.UnreadRune()
+				return rd.readCSParamNum()
 			}
 		case r >= 0x20 && r <= 0x2f:
-			l.setState(lexCSInter)
+			rd.setState(rdCSInter)
 			return &token{TokInter, string(r)}, nil
 		}
-	case lexCSInter:
+	case rdCSInter:
 		switch {
 		case r >= 0x40 && r <= 0x7e:
-			l.setState(lexDefault)
+			rd.setState(rsDefault)
 			return &token{TokFinal, string(r)}, nil
 		case r >= 0x20 && r <= 0x2f:
-			l.setState(lexCSInter)
+			rd.setState(rdCSInter)
 			return &token{TokInter, string(r)}, nil
 		}
 	}
 
-	l.setState(lexDefault)
+	rd.setState(rsDefault)
 	return &token{TokUnknown, string(r)}, nil
 }
 
-func (l *lexer) setState(s lexerState) {
-	l.lastState = l.state
-	l.state = s
+func (rd *reader) setState(s readerState) {
+	rd.lastState = rd.state
+	rd.state = s
 }
 
-func (l *lexer) readCSParamNum() (Token, error) {
+func (rd *reader) readCSParamNum() (Token, error) {
 	var (
 		buf bytes.Buffer
 		r   rune
@@ -116,7 +116,7 @@ func (l *lexer) readCSParamNum() (Token, error) {
 	)
 
 	for {
-		r, _, err = l.rd.ReadRune()
+		r, _, err = rd.rs.ReadRune()
 
 		if err != nil {
 			break
@@ -125,7 +125,7 @@ func (l *lexer) readCSParamNum() (Token, error) {
 		if r >= 0x30 && r <= 0x39 {
 			buf.WriteRune(r)
 		} else {
-			l.rd.UnreadRune()
+			rd.rs.UnreadRune()
 			break
 		}
 	}
@@ -133,7 +133,7 @@ func (l *lexer) readCSParamNum() (Token, error) {
 	return &token{TokParamNum, buf.String()}, err
 }
 
-func (l *lexer) readCSPrivParam() (Token, error) {
+func (rd *reader) readCSPrivParam() (Token, error) {
 	var (
 		buf bytes.Buffer
 		r   rune
@@ -141,7 +141,7 @@ func (l *lexer) readCSPrivParam() (Token, error) {
 	)
 
 	for {
-		r, _, err = l.rd.ReadRune()
+		r, _, err = rd.rs.ReadRune()
 
 		if err != nil {
 			break
@@ -150,7 +150,7 @@ func (l *lexer) readCSPrivParam() (Token, error) {
 		if r >= 0x30 && r <= 0x3f {
 			buf.WriteRune(r)
 		} else {
-			l.rd.UnreadRune()
+			rd.rs.UnreadRune()
 			break
 		}
 	}

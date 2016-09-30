@@ -19,7 +19,7 @@ type readTokenResult struct {
 }
 
 func testReadToken(t *testing.T, input string, rtt []readTokenResult) {
-	l := NewLexer(strings.NewReader(input))
+	l := NewReader(strings.NewReader(input))
 
 	for _, r := range rtt {
 		tok, err := l.ReadToken()
